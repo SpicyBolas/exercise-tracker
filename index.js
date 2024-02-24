@@ -31,17 +31,25 @@ var userSchema = new mongoose.Schema({
 
 //Create user model
 var User = mongoose.model('User',userSchema);
-
+ 
 //Create Exercise Schema
 var exerciseSchema = new mongoose.Schema({
   description: String,
   duration: Number,
   date: String,
-  _id: String,
+  userID: String,
 });
 
 //Create Exercise model
 var Exercise = mongoose.model('Exercise',exerciseSchema);
+
+//Delete all entries for clean start
+const refreshDB =  async function(){
+  await User.deleteMany({});
+  await Exercise.deleteMany({});
+}
+
+refreshDB();
 
 //Create a POST for new users
 app.post('/api/users',async function(req,res){
@@ -72,7 +80,7 @@ app.post('/api/users/:_id/exercises',async function(req,res){
   }
   //Create new exercise entry
   var new_exercise = new Exercise({description: req.body.description, 
-    date: date_input, duration: req.body.duration, _id: req.params._id});
+    date: date_input, duration: Number(req.body.duration), userID: req.params._id});
   await new_exercise.save();
 
   var user_details = await User.findById(req.params._id,'username _id').exec();
@@ -82,9 +90,11 @@ app.post('/api/users/:_id/exercises',async function(req,res){
   }else{
     var output_username = user_details.username;
   }
+  //TODO: make sure the date returned is 2 digits for the day
+
   //Return the response
-  res.json({username: output_username,description: req.body.description,
-    duration: req.body.duration,date: date_input,_id: req.params._id});
+  res.json({username: user_details.username,description: req.body.description,
+    duration: Number(req.body.duration), _id: user_details._id.toString(),date: date_input});
 });
 
 //Create a GET response for logs given a user
@@ -92,7 +102,7 @@ app.get('/api/users/:_id/logs?[from][&to][&limit]',async function(req,res){
   var get_username = await User.findById(req.params._id,'username').exec();
   
   //Check for the existence of optional parameters from and to and perform the query in each case
-  var query_exercises = Exercise.find({_id: req.params._id},'description duration date');
+  var query_exercises = Exercise.find({userID: req.params._id},'description duration date');
 
   if(req.query.from!==null&req.query.to===null){
     query_exercises = query_exercises.$where(`new Date(date)>=new Date(${req.query.from})`); 
